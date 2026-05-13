@@ -1,37 +1,53 @@
 import { useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import MapView, { MapPressEvent, Marker } from "react-native-maps";
+
+type ReminderLocation = {
+  latitude: number;
+  longitude: number;
+};
 
 export default function HomeScreen() {
-  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedLocation, setSelectedLocation] =
+    useState<ReminderLocation | null>(null);
+
+  const handleMapPress = (event: MapPressEvent) => {
+    const { latitude, longitude } = event.nativeEvent.coordinate;
+
+    setSelectedLocation({
+      latitude,
+      longitude,
+    });
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Svrati</Text>
+      <MapView
+        style={styles.map}
+        initialRegion={{
+          latitude: 44.7866,
+          longitude: 20.4489,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        }}
+        onPress={handleMapPress}
+      >
+        {selectedLocation && (
+          <Marker
+            coordinate={selectedLocation}
+            title="Reminder location"
+            description="You selected this place"
+          />
+        )}
+      </MapView>
 
-      <Text style={styles.subtitle}>Never forget a place again.</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Svrati</Text>
 
-      <Pressable style={styles.button} onPress={() => setIsModalVisible(true)}>
-        <Text style={styles.buttonText}>Add Reminder</Text>
-      </Pressable>
-
-      <Modal visible={isModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add new reminder</Text>
-
-            <Text style={styles.modalText}>
-              Later, this will open a map and let you choose a location.
-            </Text>
-
-            <Pressable
-              style={styles.closeButton}
-              onPress={() => setIsModalVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+        <Text style={styles.subtitle}>
+          Tap anywhere on the map to add a reminder
+        </Text>
+      </View>
     </View>
   );
 }
@@ -39,76 +55,31 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F172A",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
+  },
+
+  map: {
+    flex: 1,
+  },
+
+  header: {
+    position: "absolute",
+    top: 70,
+    left: 20,
+    right: 20,
+    backgroundColor: "rgba(15, 23, 42, 0.9)",
+    padding: 20,
+    borderRadius: 20,
   },
 
   title: {
-    fontSize: 42,
-    fontWeight: "700",
     color: "#FFFFFF",
-    marginBottom: 12,
+    fontSize: 28,
+    fontWeight: "700",
+    marginBottom: 6,
   },
 
   subtitle: {
-    fontSize: 18,
     color: "#CBD5E1",
-    textAlign: "center",
-    marginBottom: 40,
-  },
-
-  button: {
-    backgroundColor: "#3B82F6",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 16,
-  },
-
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.75)",
-    justifyContent: "flex-end",
-  },
-
-  modalContent: {
-    backgroundColor: "#FFFFFF",
-    padding: 24,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-  },
-
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#0F172A",
-    marginBottom: 12,
-  },
-
-  modalText: {
-    fontSize: 16,
-    color: "#475569",
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-
-  closeButton: {
-    backgroundColor: "#0F172A",
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: "center",
-  },
-
-  closeButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 15,
   },
 });
