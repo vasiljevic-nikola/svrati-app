@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   FlatList,
   Modal,
@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import * as Location from "expo-location";
 import MapView, { MapPressEvent, Marker } from "react-native-maps";
 
 type ReminderLocation = {
@@ -22,12 +23,51 @@ type Reminder = {
 };
 
 export default function HomeScreen() {
+  const mapRef = useRef<MapView | null>(null);
+
   const [selectedLocation, setSelectedLocation] =
     useState<ReminderLocation | null>(null);
+
+  const [userLocation, setUserLocation] = useState<ReminderLocation | null>(
+    null,
+  );
+
+  const [locationError, setLocationError] = useState("");
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [reminderText, setReminderText] = useState("");
   const [reminders, setReminders] = useState<Reminder[]>([]);
+
+  useEffect(() => {
+    const getUserLocation = async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== "granted") {
+        setLocationError("Location permission was denied.");
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+
+      const currentLocation = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
+
+      setUserLocation(currentLocation);
+
+      mapRef.current?.animateToRegion(
+        {
+          ...currentLocation,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
+        1000,
+      );
+    };
+
+    getUserLocation();
+  }, []);
 
   const handleMapPress = (event: MapPressEvent) => {
     const { latitude, longitude } = event.nativeEvent.coordinate;
@@ -57,9 +97,25 @@ export default function HomeScreen() {
     setIsModalVisible(false);
   };
 
+  const centerMapOnUserLocation = () => {
+    if (!userLocation) {
+      return;
+    }
+
+    mapRef.current?.animateToRegion(
+      {
+        ...userLocation,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      },
+      1000,
+    );
+  };
+
   return (
     <View style={styles.container}>
       <MapView
+        ref={mapRef}
         style={styles.map}
         initialRegion={{
           latitude: 44.7866,
@@ -69,6 +125,15 @@ export default function HomeScreen() {
         }}
         onPress={handleMapPress}
       >
+        {userLocation && (
+          <Marker
+            coordinate={userLocation}
+            title="You are here"
+            description="Your current location"
+            pinColor="green"
+          />
+        )}
+
         {reminders.map((reminder) => (
           <Marker
             key={reminder.id}
@@ -93,7 +158,18 @@ export default function HomeScreen() {
         <Text style={styles.subtitle}>
           Tap anywhere on the map to add a reminder
         </Text>
+
+        {locationError ? (
+          <Text style={styles.errorText}>{locationError}</Text>
+        ) : null}
       </View>
+
+      <Pressable
+        style={styles.locationButton}
+        onPress={centerMapOnUserLocation}
+      >
+        <Text style={styles.locationButtonText}>My location</Text>
+      </Pressable>
 
       <View style={styles.remindersPanel}>
         <Text style={styles.panelTitle}>
@@ -182,6 +258,28 @@ const styles = StyleSheet.create({
   subtitle: {
     color: "#CBD5E1",
     fontSize: 15,
+  },
+
+  errorText: {
+    color: "#FCA5A5",
+    fontSize: 13,
+    marginTop: 8,
+  },
+
+  locationButton: {
+    position: "absolute",
+    right: 20,
+    top: 185,
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+  },
+
+  locationButtonText: {
+    color: "#0F172A",
+    fontSize: 14,
+    fontWeight: "700",
   },
 
   remindersPanel: {
