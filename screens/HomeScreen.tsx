@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -24,9 +25,11 @@ type Reminder = {
 };
 
 const REMINDERS_STORAGE_KEY = "svrati-reminders";
+const REMINDER_TRIGGER_DISTANCE = 200;
 
 export default function HomeScreen() {
   const mapRef = useRef<MapView | null>(null);
+  const triggeredReminderIds = useRef<Set<string>>(new Set());
 
   const [selectedLocation, setSelectedLocation] =
     useState<ReminderLocation | null>(null);
@@ -43,8 +46,14 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadSavedReminders();
-    getUserLocation();
+    setupLocationTracking();
   }, []);
+
+  useEffect(() => {
+    if (userLocation) {
+      checkNearbyReminders(userLocation);
+    }
+  }, [userLocation, reminders]);
 
   const loadSavedReminders = async () => {
     try {
@@ -69,7 +78,7 @@ export default function HomeScreen() {
     }
   };
 
-  const getUserLocation = async () => {
+  const setupLocationTracking = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
 
     if (status !== "granted") {
@@ -77,11 +86,11 @@ export default function HomeScreen() {
       return;
     }
 
-    const location = await Location.getCurrentPositionAsync({});
+    const currentPosition = await Location.getCurrentPositionAsync({});
 
     const currentLocation = {
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
+      latitude: currentPosition.coords.latitude,
+      longitude: currentPosition.coords.longitude,
     };
 
     setUserLocation(currentLocation);
@@ -94,6 +103,66 @@ export default function HomeScreen() {
       },
       1000,
     );
+
+    await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.High,
+        distanceInterval: 25,
+      },
+      (location) => {
+        const updatedLocation = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        };
+
+        setUserLocation(updatedLocation);
+      },
+    );
+  };
+
+  const checkNearbyReminders = (currentLocation: ReminderLocation) => {
+    reminders.forEach((reminder) => {
+      const distance = getDistanceInMeters(
+        currentLocation.latitude,
+        currentLocation.longitude,
+        reminder.location.latitude,
+        reminder.location.longitude,
+      );
+
+      const alreadyTriggered = triggeredReminderIds.current.has(reminder.id);
+
+      if (distance <= REMINDER_TRIGGER_DISTANCE && !alreadyTriggered) {
+        triggeredReminderIds.current.add(reminder.id);
+
+        Alert.alert(
+          "Nearby reminder",
+          `You are ${Math.round(distance)}m away from: ${reminder.text}`,
+        );
+      }
+    });
+  };
+
+  const getDistanceInMeters = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ) => {
+    const R = 6371e3;
+
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
   };
 
   const handleMapPress = (event: MapPressEvent) => {
@@ -129,6 +198,8 @@ export default function HomeScreen() {
 
   const handleDeleteReminder = (id: string) => {
     const updatedReminders = reminders.filter((reminder) => reminder.id !== id);
+
+    triggeredReminderIds.current.delete(id);
 
     setReminders(updatedReminders);
     saveRemindersToStorage(updatedReminders);
@@ -204,9 +275,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Svrati</Text>
 
-        <Text style={styles.subtitle}>
-          Tap anywhere on the map to add a reminder
-        </Text>
+        <Text style={styles.subtitle}>Nearby reminder detection enabled</Text>
 
         {locationError ? (
           <Text style={styles.errorText}>{locationError}</Text>
