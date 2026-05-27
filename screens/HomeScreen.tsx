@@ -21,11 +21,12 @@ type ReminderLocation = {
 type Reminder = {
   id: string;
   text: string;
+  radius: number;
   location: ReminderLocation;
 };
 
 const REMINDERS_STORAGE_KEY = "svrati-reminders";
-const REMINDER_TRIGGER_DISTANCE = 200;
+const DEFAULT_REMINDER_RADIUS = 200;
 
 export default function HomeScreen() {
   const mapRef = useRef<MapView | null>(null);
@@ -131,7 +132,7 @@ export default function HomeScreen() {
 
       const alreadyTriggered = triggeredReminderIds.current.has(reminder.id);
 
-      if (distance <= REMINDER_TRIGGER_DISTANCE && !alreadyTriggered) {
+      if (distance <= reminder.radius && !alreadyTriggered) {
         triggeredReminderIds.current.add(reminder.id);
 
         Alert.alert(
@@ -184,6 +185,7 @@ export default function HomeScreen() {
     const newReminder: Reminder = {
       id: Date.now().toString(),
       text: reminderText.trim(),
+      radius: DEFAULT_REMINDER_RADIUS,
       location: selectedLocation,
     };
 
@@ -194,6 +196,7 @@ export default function HomeScreen() {
 
     setReminderText("");
     setIsModalVisible(false);
+    setSelectedLocation(null);
   };
 
   const handleDeleteReminder = (id: string) => {
@@ -258,7 +261,7 @@ export default function HomeScreen() {
             key={reminder.id}
             coordinate={reminder.location}
             title={reminder.text}
-            description="Saved reminder"
+            description={`Reminder radius: ${reminder.radius}m`}
           />
         ))}
 
@@ -311,6 +314,8 @@ export default function HomeScreen() {
               >
                 <Text style={styles.reminderText}>{item.text}</Text>
 
+                <Text style={styles.radiusText}>Radius: {item.radius}m</Text>
+
                 <Text style={styles.coordinatesText}>
                   {item.location.latitude.toFixed(4)},{" "}
                   {item.location.longitude.toFixed(4)}
@@ -340,6 +345,8 @@ export default function HomeScreen() {
               value={reminderText}
               onChangeText={setReminderText}
             />
+
+            <Text style={styles.radiusInfo}>Default reminder radius: 200m</Text>
 
             <Pressable style={styles.saveButton} onPress={handleSaveReminder}>
               <Text style={styles.saveButtonText}>Save Reminder</Text>
@@ -448,6 +455,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
+  radiusText: {
+    fontSize: 13,
+    color: "#2563EB",
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+
   coordinatesText: {
     fontSize: 12,
     color: "#64748B",
@@ -494,6 +508,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#0F172A",
     marginBottom: 16,
+  },
+
+  radiusInfo: {
+    fontSize: 14,
+    color: "#64748B",
+    marginBottom: 18,
   },
 
   saveButton: {
