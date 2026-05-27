@@ -26,7 +26,8 @@ type Reminder = {
 };
 
 const REMINDERS_STORAGE_KEY = "svrati-reminders";
-const DEFAULT_REMINDER_RADIUS = 200;
+
+const RADIUS_OPTIONS = [100, 200, 500];
 
 export default function HomeScreen() {
   const mapRef = useRef<MapView | null>(null);
@@ -42,7 +43,11 @@ export default function HomeScreen() {
   const [locationError, setLocationError] = useState("");
 
   const [isModalVisible, setIsModalVisible] = useState(false);
+
   const [reminderText, setReminderText] = useState("");
+
+  const [selectedRadius, setSelectedRadius] = useState(200);
+
   const [reminders, setReminders] = useState<Reminder[]>([]);
 
   useEffect(() => {
@@ -185,7 +190,7 @@ export default function HomeScreen() {
     const newReminder: Reminder = {
       id: Date.now().toString(),
       text: reminderText.trim(),
-      radius: DEFAULT_REMINDER_RADIUS,
+      radius: selectedRadius,
       location: selectedLocation,
     };
 
@@ -195,6 +200,7 @@ export default function HomeScreen() {
     saveRemindersToStorage(updatedReminders);
 
     setReminderText("");
+    setSelectedRadius(200);
     setIsModalVisible(false);
     setSelectedLocation(null);
   };
@@ -346,7 +352,30 @@ export default function HomeScreen() {
               onChangeText={setReminderText}
             />
 
-            <Text style={styles.radiusInfo}>Default reminder radius: 200m</Text>
+            <Text style={styles.radiusLabel}>Select reminder radius</Text>
+
+            <View style={styles.radiusButtonsContainer}>
+              {RADIUS_OPTIONS.map((radius) => (
+                <Pressable
+                  key={radius}
+                  style={[
+                    styles.radiusButton,
+                    selectedRadius === radius && styles.radiusButtonActive,
+                  ]}
+                  onPress={() => setSelectedRadius(radius)}
+                >
+                  <Text
+                    style={[
+                      styles.radiusButtonText,
+                      selectedRadius === radius &&
+                        styles.radiusButtonTextActive,
+                    ]}
+                  >
+                    {radius}m
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
 
             <Pressable style={styles.saveButton} onPress={handleSaveReminder}>
               <Text style={styles.saveButtonText}>Save Reminder</Text>
@@ -507,13 +536,43 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 16,
     color: "#0F172A",
-    marginBottom: 16,
+    marginBottom: 20,
   },
 
-  radiusInfo: {
-    fontSize: 14,
-    color: "#64748B",
-    marginBottom: 18,
+  radiusLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#0F172A",
+    marginBottom: 12,
+  },
+
+  radiusButtonsContainer: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 24,
+  },
+
+  radiusButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+
+  radiusButtonActive: {
+    backgroundColor: "#3B82F6",
+    borderColor: "#3B82F6",
+  },
+
+  radiusButtonText: {
+    color: "#0F172A",
+    fontWeight: "600",
+  },
+
+  radiusButtonTextActive: {
+    color: "#FFFFFF",
   },
 
   saveButton: {
