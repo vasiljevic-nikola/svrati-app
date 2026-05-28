@@ -26,7 +26,6 @@ type Reminder = {
 };
 
 const REMINDERS_STORAGE_KEY = "svrati-reminders";
-
 const RADIUS_OPTIONS = [100, 200, 500];
 
 export default function HomeScreen() {
@@ -45,8 +44,10 @@ export default function HomeScreen() {
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   const [reminderText, setReminderText] = useState("");
-
   const [selectedRadius, setSelectedRadius] = useState(200);
+  const [editingReminderId, setEditingReminderId] = useState<string | null>(
+    null,
+  );
 
   const [reminders, setReminders] = useState<Reminder[]>([]);
 
@@ -179,11 +180,38 @@ export default function HomeScreen() {
       longitude,
     });
 
+    setReminderText("");
+    setSelectedRadius(200);
+    setEditingReminderId(null);
     setIsModalVisible(true);
   };
 
   const handleSaveReminder = () => {
-    if (!selectedLocation || reminderText.trim() === "") {
+    if (reminderText.trim() === "") {
+      return;
+    }
+
+    if (editingReminderId) {
+      const updatedReminders = reminders.map((reminder) => {
+        if (reminder.id !== editingReminderId) {
+          return reminder;
+        }
+
+        return {
+          ...reminder,
+          text: reminderText.trim(),
+          radius: selectedRadius,
+        };
+      });
+
+      setReminders(updatedReminders);
+      saveRemindersToStorage(updatedReminders);
+      triggeredReminderIds.current.delete(editingReminderId);
+      resetReminderForm();
+      return;
+    }
+
+    if (!selectedLocation) {
       return;
     }
 
@@ -199,10 +227,23 @@ export default function HomeScreen() {
     setReminders(updatedReminders);
     saveRemindersToStorage(updatedReminders);
 
+    resetReminderForm();
+  };
+
+  const resetReminderForm = () => {
     setReminderText("");
     setSelectedRadius(200);
+    setEditingReminderId(null);
     setIsModalVisible(false);
     setSelectedLocation(null);
+  };
+
+  const handleEditReminder = (reminder: Reminder) => {
+    setEditingReminderId(reminder.id);
+    setReminderText(reminder.text);
+    setSelectedRadius(reminder.radius);
+    setSelectedLocation(null);
+    setIsModalVisible(true);
   };
 
   const handleDeleteReminder = (id: string) => {
@@ -239,6 +280,12 @@ export default function HomeScreen() {
       1000,
     );
   };
+
+  const modalTitle = editingReminderId
+    ? "Edit reminder"
+    : "Why do you want to come here?";
+
+  const saveButtonLabel = editingReminderId ? "Save Changes" : "Save Reminder";
 
   return (
     <View style={styles.container}>
@@ -327,12 +374,21 @@ export default function HomeScreen() {
                   {item.location.longitude.toFixed(4)}
                 </Text>
 
-                <Pressable
-                  style={styles.deleteButton}
-                  onPress={() => handleDeleteReminder(item.id)}
-                >
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </Pressable>
+                <View style={styles.cardActions}>
+                  <Pressable
+                    style={styles.editButton}
+                    onPress={() => handleEditReminder(item)}
+                  >
+                    <Text style={styles.actionButtonText}>Edit</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteReminder(item.id)}
+                  >
+                    <Text style={styles.actionButtonText}>Delete</Text>
+                  </Pressable>
+                </View>
               </Pressable>
             )}
           />
@@ -342,7 +398,7 @@ export default function HomeScreen() {
       <Modal visible={isModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Why do you want to come here?</Text>
+            <Text style={styles.modalTitle}>{modalTitle}</Text>
 
             <TextInput
               style={styles.input}
@@ -378,13 +434,10 @@ export default function HomeScreen() {
             </View>
 
             <Pressable style={styles.saveButton} onPress={handleSaveReminder}>
-              <Text style={styles.saveButtonText}>Save Reminder</Text>
+              <Text style={styles.saveButtonText}>{saveButtonLabel}</Text>
             </Pressable>
 
-            <Pressable
-              style={styles.cancelButton}
-              onPress={() => setIsModalVisible(false)}
-            >
+            <Pressable style={styles.cancelButton} onPress={resetReminderForm}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
           </View>
@@ -470,7 +523,7 @@ const styles = StyleSheet.create({
   },
 
   reminderCard: {
-    width: 200,
+    width: 220,
     backgroundColor: "#F1F5F9",
     padding: 14,
     borderRadius: 16,
@@ -497,14 +550,28 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
+  cardActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  editButton: {
+    flex: 1,
+    backgroundColor: "#3B82F6",
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+
   deleteButton: {
+    flex: 1,
     backgroundColor: "#EF4444",
     paddingVertical: 10,
     borderRadius: 12,
     alignItems: "center",
   },
 
-  deleteButtonText: {
+  actionButtonText: {
     color: "#FFFFFF",
     fontWeight: "700",
   },
