@@ -22,8 +22,11 @@ type Reminder = {
   id: string;
   text: string;
   radius: number;
+  isCompleted: boolean;
   location: ReminderLocation;
 };
+
+type ReminderFilter = "active" | "visited";
 
 const REMINDERS_STORAGE_KEY = "svrati-reminders";
 const RADIUS_OPTIONS = [100, 200, 500];
@@ -50,6 +53,8 @@ export default function HomeScreen() {
   );
 
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [selectedFilter, setSelectedFilter] =
+    useState<ReminderFilter>("active");
 
   useEffect(() => {
     loadSavedReminders();
@@ -67,7 +72,16 @@ export default function HomeScreen() {
       const savedReminders = await AsyncStorage.getItem(REMINDERS_STORAGE_KEY);
 
       if (savedReminders) {
-        setReminders(JSON.parse(savedReminders));
+        const parsedReminders = JSON.parse(savedReminders);
+
+        const normalizedReminders = parsedReminders.map(
+          (reminder: Reminder) => ({
+            ...reminder,
+            isCompleted: reminder.isCompleted ?? false,
+          }),
+        );
+
+        setReminders(normalizedReminders);
       }
     } catch (error) {
       console.log("Failed to load reminders:", error);
@@ -129,6 +143,10 @@ export default function HomeScreen() {
 
   const checkNearbyReminders = (currentLocation: ReminderLocation) => {
     reminders.forEach((reminder) => {
+      if (reminder.isCompleted) {
+        return;
+      }
+
       const distance = getDistanceInMeters(
         currentLocation.latitude,
         currentLocation.longitude,
@@ -219,6 +237,7 @@ export default function HomeScreen() {
       id: Date.now().toString(),
       text: reminderText.trim(),
       radius: selectedRadius,
+      isCompleted: false,
       location: selectedLocation,
     };
 
@@ -226,6 +245,7 @@ export default function HomeScreen() {
 
     setReminders(updatedReminders);
     saveRemindersToStorage(updatedReminders);
+    setSelectedFilter("active");
 
     resetReminderForm();
   };
@@ -248,6 +268,24 @@ export default function HomeScreen() {
 
   const handleDeleteReminder = (id: string) => {
     const updatedReminders = reminders.filter((reminder) => reminder.id !== id);
+
+    triggeredReminderIds.current.delete(id);
+
+    setReminders(updatedReminders);
+    saveRemindersToStorage(updatedReminders);
+  };
+
+  const handleToggleReminderCompleted = (id: string) => {
+    const updatedReminders = reminders.map((reminder) => {
+      if (reminder.id !== id) {
+        return reminder;
+      }
+
+      return {
+        ...reminder,
+        isCompleted: !reminder.isCompleted,
+      };
+    });
 
     triggeredReminderIds.current.delete(id);
 
@@ -280,6 +318,13 @@ export default function HomeScreen() {
       1000,
     );
   };
+
+  const activeReminders = reminders.filter((reminder) => !reminder.isCompleted);
+
+  const visitedReminders = reminders.filter((reminder) => reminder.isCompleted);
+
+  const filteredReminders =
+    selectedFilter === "active" ? activeReminders : visitedReminders;
 
   const modalTitle = editingReminderId
     ? "Edit reminder"
@@ -314,7 +359,12 @@ export default function HomeScreen() {
             key={reminder.id}
             coordinate={reminder.location}
             title={reminder.text}
-            description={`Reminder radius: ${reminder.radius}m`}
+            description={
+              reminder.isCompleted
+                ? "Visited reminder"
+                : `Reminder radius: ${reminder.radius}m`
+            }
+            pinColor={reminder.isCompleted ? "gray" : "red"}
           />
         ))}
 
@@ -331,7 +381,9 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Svrati</Text>
 
-        <Text style={styles.subtitle}>Nearby reminder detection enabled</Text>
+        <Text style={styles.subtitle}>
+          Active: {activeReminders.length} | Visited: {visitedReminders.length}
+        </Text>
 
         {locationError ? (
           <Text style={styles.errorText}>{locationError}</Text>
@@ -346,26 +398,74 @@ export default function HomeScreen() {
       </Pressable>
 
       <View style={styles.remindersPanel}>
-        <Text style={styles.panelTitle}>
-          Saved reminders ({reminders.length})
-        </Text>
+        <View style={styles.panelHeader}>
+          <Text style={styles.panelTitle}>Reminders</Text>
 
-        {reminders.length === 0 ? (
+          <View style={styles.filterContainer}>
+            <Pressable
+              style={[
+                styles.filterButton,
+                selectedFilter === "active" && styles.filterButtonActive,
+              ]}
+              onPress={() => setSelectedFilter("active")}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  selectedFilter === "active" && styles.filterButtonTextActive,
+                ]}
+              >
+                Active
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.filterButton,
+                selectedFilter === "visited" && styles.filterButtonActive,
+              ]}
+              onPress={() => setSelectedFilter("visited")}
+            >
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  selectedFilter === "visited" && styles.filterButtonTextActive,
+                ]}
+              >
+                Visited
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {filteredReminders.length === 0 ? (
           <Text style={styles.emptyText}>
-            No reminders yet. Tap the map to add one.
+            {selectedFilter === "active"
+              ? "No active reminders. Tap the map to add one."
+              : "No visited reminders yet."}
           </Text>
         ) : (
           <FlatList
-            data={reminders}
+            data={filteredReminders}
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
             renderItem={({ item }) => (
               <Pressable
-                style={styles.reminderCard}
+                style={[
+                  styles.reminderCard,
+                  item.isCompleted && styles.reminderCardCompleted,
+                ]}
                 onPress={() => focusReminderOnMap(item.location)}
               >
-                <Text style={styles.reminderText}>{item.text}</Text>
+                <Text
+                  style={[
+                    styles.reminderText,
+                    item.isCompleted && styles.reminderTextCompleted,
+                  ]}
+                >
+                  {item.text}
+                </Text>
 
                 <Text style={styles.radiusText}>Radius: {item.radius}m</Text>
 
@@ -375,6 +475,15 @@ export default function HomeScreen() {
                 </Text>
 
                 <View style={styles.cardActions}>
+                  <Pressable
+                    style={styles.doneButton}
+                    onPress={() => handleToggleReminderCompleted(item.id)}
+                  >
+                    <Text style={styles.actionButtonText}>
+                      {item.isCompleted ? "Undo" : "Done"}
+                    </Text>
+                  </Pressable>
+
                   <Pressable
                     style={styles.editButton}
                     onPress={() => handleEditReminder(item)}
@@ -510,11 +619,44 @@ const styles = StyleSheet.create({
     borderRadius: 22,
   },
 
+  panelHeader: {
+    marginBottom: 12,
+  },
+
   panelTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: "#0F172A",
     marginBottom: 10,
+  },
+
+  filterContainer: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  filterButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+
+  filterButtonActive: {
+    backgroundColor: "#0F172A",
+    borderColor: "#0F172A",
+  },
+
+  filterButtonText: {
+    color: "#0F172A",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  filterButtonTextActive: {
+    color: "#FFFFFF",
   },
 
   emptyText: {
@@ -523,11 +665,15 @@ const styles = StyleSheet.create({
   },
 
   reminderCard: {
-    width: 220,
+    width: 260,
     backgroundColor: "#F1F5F9",
     padding: 14,
     borderRadius: 16,
     marginRight: 12,
+  },
+
+  reminderCardCompleted: {
+    backgroundColor: "#E2E8F0",
   },
 
   reminderText: {
@@ -535,6 +681,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#0F172A",
     marginBottom: 8,
+  },
+
+  reminderTextCompleted: {
+    color: "#64748B",
+    textDecorationLine: "line-through",
   },
 
   radiusText: {
@@ -555,6 +706,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
+  doneButton: {
+    flex: 1,
+    backgroundColor: "#22C55E",
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+
   editButton: {
     flex: 1,
     backgroundColor: "#3B82F6",
@@ -573,6 +732,7 @@ const styles = StyleSheet.create({
 
   actionButtonText: {
     color: "#FFFFFF",
+    fontSize: 12,
     fontWeight: "700",
   },
 
