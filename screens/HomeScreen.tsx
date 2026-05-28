@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
-import MapView, { MapPressEvent, Marker } from "react-native-maps";
+import MapView, { Circle, MapPressEvent, Marker } from "react-native-maps";
 
 type ReminderLocation = {
   latitude: number;
@@ -190,6 +190,25 @@ export default function HomeScreen() {
     return R * c;
   };
 
+  const formatDistance = (reminderLocation: ReminderLocation) => {
+    if (!userLocation) {
+      return "Distance unavailable";
+    }
+
+    const distance = getDistanceInMeters(
+      userLocation.latitude,
+      userLocation.longitude,
+      reminderLocation.latitude,
+      reminderLocation.longitude,
+    );
+
+    if (distance < 1000) {
+      return `${Math.round(distance)}m away`;
+    }
+
+    return `${(distance / 1000).toFixed(1)}km away`;
+  };
+
   const handleMapPress = (event: MapPressEvent) => {
     const { latitude, longitude } = event.nativeEvent.coordinate;
 
@@ -354,19 +373,26 @@ export default function HomeScreen() {
           />
         )}
 
-        {reminders.map((reminder) => (
-          <Marker
-            key={reminder.id}
-            coordinate={reminder.location}
-            title={reminder.text}
-            description={
-              reminder.isCompleted
-                ? "Visited reminder"
-                : `Reminder radius: ${reminder.radius}m`
-            }
-            pinColor={reminder.isCompleted ? "gray" : "red"}
-          />
-        ))}
+        {reminders
+          .filter((reminder) => !reminder.isCompleted)
+          .map((reminder) => (
+            <View key={reminder.id}>
+              <Marker
+                coordinate={reminder.location}
+                title={reminder.text}
+                description={`Reminder radius: ${reminder.radius}m`}
+                pinColor="red"
+              />
+
+              <Circle
+                center={reminder.location}
+                radius={reminder.radius}
+                strokeColor="rgba(59, 130, 246, 0.8)"
+                fillColor="rgba(59, 130, 246, 0.15)"
+                strokeWidth={2}
+              />
+            </View>
+          ))}
 
         {selectedLocation && (
           <Marker
@@ -441,7 +467,7 @@ export default function HomeScreen() {
         {filteredReminders.length === 0 ? (
           <Text style={styles.emptyText}>
             {selectedFilter === "active"
-              ? "No active reminders. Tap the map to add one."
+              ? "No active reminders."
               : "No visited reminders yet."}
           </Text>
         ) : (
@@ -468,6 +494,10 @@ export default function HomeScreen() {
                 </Text>
 
                 <Text style={styles.radiusText}>Radius: {item.radius}m</Text>
+
+                <Text style={styles.distanceText}>
+                  {formatDistance(item.location)}
+                </Text>
 
                 <Text style={styles.coordinatesText}>
                   {item.location.latitude.toFixed(4)},{" "}
@@ -511,7 +541,7 @@ export default function HomeScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder="Example: Buy coffee, visit shop..."
+              placeholder="Example: Buy coffee..."
               placeholderTextColor="#94A3B8"
               value={reminderText}
               onChangeText={setReminderText}
@@ -557,13 +587,8 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-
-  map: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  map: { flex: 1 },
 
   header: {
     position: "absolute",
@@ -692,6 +717,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#2563EB",
     fontWeight: "600",
+    marginBottom: 6,
+  },
+
+  distanceText: {
+    fontSize: 13,
+    color: "#0F172A",
+    fontWeight: "700",
     marginBottom: 6,
   },
 
