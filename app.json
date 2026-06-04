@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Svrati",
-    "slug": "Svrati",
+    "slug": "svrati",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,6 +16,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.vasiljevicnikola.svrati",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -25,6 +26,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "91a4a2d2-8b0f-4f48-a4c4-e9761c4dcb54"
+      }
     }
   }
 }
